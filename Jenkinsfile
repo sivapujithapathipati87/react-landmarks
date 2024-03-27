@@ -1,11 +1,25 @@
 pipeline {
     agent any
     environment {
+        SONAR_SCANNER='/opt/sonar-scanner' // Corrected variable name
         DOCKER_CREDS = credentials('docker123')
         DOCKER_IMAGE = 'sivapujitha'
     }
-    stages {
-                 
+    stages {        
+        // sonar code quality check
+        stage('Sonar Analysis') {
+            steps {
+                withSonarQubeEnv(credentialsId: 'sonarqube', installationName: 'sonarqube') {
+                    sh """
+                    \${SONAR_SCANNER}/bin/sonar-scanner \
+                    -Dsonar.projectKey=react \
+                    -Dsonar.sources=. \
+                    -Dsonar.host.url=http://localhost:9000 \
+                    -Dsonar.login=sqp_5ecda522e2bfd890796bbe764381d30dae231b99
+                    """
+                }
+            }
+        }
         // docker image build using dockerfile 
         stage('Docker Build') {
             steps {
@@ -37,4 +51,18 @@ pipeline {
             }
         }
     }
+    // email notification
+         post {
+           success {
+                    mail subject: 'build stage succeded',
+                          to: 'pujisiri2008@gmail.com',
+                          body: "Refer to $BUILD_URL for more details"
+            }
+           failure {
+                    mail subject: 'build stage failed',
+                         to: 'pujisiri2008@gmail.com',
+                         body: "Refer to $BUILD_URL for more details"
+                }
+        }
+
 }
