@@ -1,29 +1,11 @@
 pipeline {
     agent any
     environment {
-        SONAR_SCANNER='/opt/sonar-scanner' // Corrected variable name
+        DOCKER_CREDS = credentials('docker123')
+        DOCKER_IMAGE =sivapujitha
     }
     stages {
-        // clone the source code from git
-        stage('checkout') {
-            steps {
-                git 'https://github.com/sivapujithapathipati87/react-landmarks.git'
-            }
-        }
-        // sonar code quality check
-        stage('Sonar Analysis') {
-            steps {
-                withSonarQubeEnv(credentialsId: 'sonarqube', installationName: 'sonarqube') {
-                    sh """
-                    \${SONAR_SCANNER}/bin/sonar-scanner \
-                    -Dsonar.projectKey=react \
-                    -Dsonar.sources=. \
-                    -Dsonar.host.url=http://localhost:9000 \
-                    -Dsonar.login=sqp_5ecda522e2bfd890796bbe764381d30dae231b99
-                    """
-                }
-            }
-        }
+                 
         // docker image build using dockerfile 
         stage('Docker Build') {
             steps {
@@ -34,11 +16,11 @@ pipeline {
          stage('Push to Docker Hub') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'docker123', usernameVariable: 'sivapujitha', passwordVariable: 'Rakhi#123$')]) {
-                        sh 'docker login -u sivapujitha -p Rakhi#123$'
+                    withCredentials([usernamePassword(credentialsId: 'docker123', usernameVariable: 'DOCKER_CREDS_USR', passwordVariable: 'DOCKER_CREDS_PSW')]) {
+                        sh 'docker login -u $DOCKER_CREDS_USR -p $DOCKER_CREDS_PSW'
                     }
-                    sh 'docker tag react sivapujitha/react:latest'
-                    sh 'docker push sivapujitha/react:latest'
+                    sh 'docker tag react $DOCKER_IMAGE/react:latest'
+                    sh 'docker push $DOKCER_IMAGE/react:latest'
                 }
             }
         }
@@ -55,17 +37,4 @@ pipeline {
             }
         }
     }
-    // email notification
-         post {
-           success {
-                    mail subject: 'build stage succeded',
-                          to: 'pujisiri2008@gmail.com',
-                          body: "Refer to $BUILD_URL for more details"
-            }
-           failure {
-                    mail subject: 'build stage failed',
-                         to: 'pujisiri2008@gmail.com',
-                         body: "Refer to $BUILD_URL for more details"
-                }
-        }
 }
