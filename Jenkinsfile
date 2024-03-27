@@ -2,7 +2,7 @@ pipeline {
     agent any
     environment {
         DOCKER_CREDS = credentials('docker123')
-        DOCKER_IMAGE = sivapujitha
+        DOCKER_IMAGE = 'sivapujitha'
     }
     stages {
                  
