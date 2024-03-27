@@ -20,7 +20,7 @@ pipeline {
                         sh 'docker login -u $DOCKER_CREDS_USR -p $DOCKER_CREDS_PSW'
                     }
                     sh 'docker tag react $DOCKER_IMAGE/react:latest'
-                    sh 'docker push $DOKCER_IMAGE/react:latest'
+                    sh 'docker push $DOCKER_IMAGE/react:latest'
                 }
             }
         }
