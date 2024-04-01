@@ -1,49 +1,56 @@
 pipeline {
     agent any
     environment {
-        SONAR_SCANNER='/opt/sonar-scanner' // Corrected variable name
-        DOCKER_CREDS = credentials('docker123')
-        DOCKER_IMAGE = 'sivapujitha'
+        //sonarqube env variables
+        SONAR_SCANNER='/opt/sonar-scanner' 
+        SONAR_URL= 'http://localhost:9000'
+        SONAR_PROJECTKEY='react'
+        SONAR_LOGIN='sqp_5ecda522e2bfd890796bbe764381d30dae231b99'
+        // harbor env variables
+        HARBOR = credentials('harbour123')
+        HARBOR_REGISTRY = 'new-harbor.duckdns.org'
+        HARBOR_PROJECT = 'new_project'
         IMAGE_NAME = 'react'
-        IMAGE_TAG = 'latest' 
+        IMAGE_TAG = 'latest'
+        IMAGE_PORT= '8000:8000'
     }
-    stages {        
+    stages {
         // sonar code quality check
         stage('Sonar Analysis') {
             steps {
                 withSonarQubeEnv(credentialsId: 'sonarqube', installationName: 'sonarqube') {
                     sh """
                     \${SONAR_SCANNER}/bin/sonar-scanner \
-                    -Dsonar.projectKey=react \
+                    -Dsonar.projectKey=$SONAR_PROJECTKEY \
                     -Dsonar.sources=. \
-                    -Dsonar.host.url=http://localhost:9000 \
-                    -Dsonar.login=sqp_5ecda522e2bfd890796bbe764381d30dae231b99
+                    -Dsonar.host.url=$SONAR_URL \
+                    -Dsonar.login=$SONAR_LOGIN
                     """
                 }
             }
         }
-        // docker image build using dockerfile 
+        // docker image build using dockerfile
         stage('Docker Build') {
             steps {
                 sh 'docker image build -t $IMAGE_NAME .'
             }
         }
-        // push docker image to dockerhub
-         stage('Push to Docker Hub') {
+        // push docker image to Harbor
+         stage('Push to Harbor Registry') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'docker123', usernameVariable: 'DOCKER_CREDS_USR', passwordVariable: 'DOCKER_CREDS_PSW')]) {
-                        sh 'docker login -u $DOCKER_CREDS_USR -p $DOCKER_CREDS_PSW'
+                    withCredentials([usernamePassword(credentialsId: 'harbor123', usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASSWORD')]) {
+                        sh "docker login $HARBOR_REGISTRY -u $HARBOR_USER -p $HARBOR_PASSWORD"
+                        sh "docker tag IMAGE_NAME $HARBOR_REGISTRY/$HARBOR_PROJECT/$IMAGE_NAME:$IMAGE_TAG"
+                        sh "docker push $HARBOR_REGISTRY/$HARBOR_PROJECT/$IMAGE_NAME:$IMAGE_TAG"
                     }
-                    sh 'docker tag react $DOCKER_IMAGE/$IMAGE_NAME:$IMAGE_TAG'
-                    sh 'docker push $DOCKER_IMAGE/$IMAGE_NAME:$IMAGE_TAG'
                 }
             }
         }
-        // run the container using docker image
+         //Run the container
         stage('Run') {
             steps {
-                sh 'docker run -d -p 3000:3000 --name $IMAGE_NAME $IMAGE_NAME'
+                sh 'docker run -d -p $IMAGE_PORT --name python $HARBOR_REGISTRY/$HARBOR_PROJECT/$IMAGE_NAME'
             }
         }
         //trivy image scanner
@@ -54,17 +61,20 @@ pipeline {
         }
     }
     // email notification
-         post {
-           success {
-                    mail subject: 'build stage succeded',
-                          to: 'pujisiri2008@gmail.com',
-                          body: "Refer to $BUILD_URL for more details"
-            }
-           failure {
-                    mail subject: 'build stage failed',
-                         to: 'pujisiri2008@gmail.com',
-                         body: "Refer to $BUILD_URL for more details"
-                }
+          post {
+        success {
+            // Send Slack notification on successful build
+            slackSend(
+                color: '#00FF00',
+                message: "Build successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+            )
         }
-
+        failure {
+            // Send Slack notification on build failure
+            slackSend(
+                color: '#FF0000',
+                message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+            )
+        }
+    }
 }
